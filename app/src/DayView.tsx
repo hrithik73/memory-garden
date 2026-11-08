@@ -1,10 +1,15 @@
 import * as Haptics from 'expo-haptics';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { addDays, pretty, short } from './dates';
-import { DoodleView, HOUSE, PLUS, plantFor } from './plants';
+import { DoodleView, HOUSE, MIC, PLUS, plantFor } from './plants';
 import type { Memories } from './storage';
 import { F, useTheme } from './theme';
+import { useDictation, voiceAvailable } from './voice';
+
+/** Add spoken words after what was already written. */
+const joinText = (before: string, spoken: string) =>
+  !spoken ? before : before.trim() ? `${before.replace(/\s+$/, '')} ${spoken}` : spoken;
 
 type Props = {
   day: string;
@@ -21,6 +26,19 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
   const memory = memories[day];
   const [draft, setDraft] = useState('');
   const future = day > today;
+
+  // speak-to-write: spoken words are added after the text written before the mic was tapped
+  const [beforeMic, setBeforeMic] = useState('');
+  const dictation = useDictation((spoken) => setDraft(joinText(beforeMic, spoken)));
+  const { listening, abort: stopListening } = dictation;
+  useEffect(() => {
+    if (!editing && listening) stopListening();
+  }, [editing, listening, stopListening]);
+  const toggleMic = () => {
+    if (listening) return dictation.stop();
+    setBeforeMic(draft);
+    dictation.start();
+  };
 
   // horizontal swipe between days
   const pan = useMemo(
@@ -42,6 +60,7 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
     setEditing(true);
   };
   const commit = () => {
+    if (listening) stopListening();
     put(day, draft);
     setEditing(false);
     if (draft.trim()) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -105,19 +124,37 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
               multiline
               value={draft}
               onChangeText={setDraft}
-              placeholder="Add a memory..."
+              placeholder={listening ? 'Listening...' : 'Add a memory...'}
               placeholderTextColor={t.inkSoft}
               selectionColor={t.ink}
               maxLength={2000}
               style={[s.input, { color: t.ink }]}
             />
             <View style={s.doneRow}>
+              {voiceAvailable && (
+                <Pressable
+                  onPress={toggleMic}
+                  hitSlop={6}
+                  accessibilityLabel={listening ? 'Stop listening' : 'Speak your memory'}
+                  style={[s.mic, { borderColor: t.ink }, listening && { backgroundColor: t.ink }]}
+                >
+                  <DoodleView shapes={MIC} size={22} color={listening ? t.bg : t.ink} />
+                </Pressable>
+              )}
+              {listening && <Text style={[s.ghost, { color: t.inkSoft }]}>listening…</Text>}
+              <View style={{ flex: 1 }} />
               {memory && (
                 <Pressable onPress={remove} hitSlop={8}>
                   <Text style={[s.ghost, { color: t.inkSoft }]}>remove</Text>
                 </Pressable>
               )}
-              <Pressable onPress={() => setEditing(false)} hitSlop={8}>
+              <Pressable
+                onPress={() => {
+                  if (listening) stopListening();
+                  setEditing(false);
+                }}
+                hitSlop={8}
+              >
                 <Text style={[s.ghost, { color: t.inkSoft }]}>cancel</Text>
               </Pressable>
               <Pressable onPress={commit} style={({ pressed }) => [s.done, { backgroundColor: t.ink }, pressed && { opacity: 0.85 }]}>
@@ -155,6 +192,7 @@ const s = StyleSheet.create({
   input: { fontFamily: F.mono, fontSize: 16, lineHeight: 23, minHeight: 120, padding: 0, textAlignVertical: 'top' },
   doneRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 16, marginTop: 12 },
   ghost: { fontFamily: F.mono, fontSize: 13 },
+  mic: { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   done: { borderRadius: 9, paddingHorizontal: 16, paddingTop: 5, paddingBottom: 3 },
   doneText: { fontFamily: F.hand, fontSize: 19, lineHeight: 24 },
   plantBtn: { alignItems: 'center', gap: 10 },

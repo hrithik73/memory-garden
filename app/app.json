@@ -27,7 +27,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Memory Garden uses the microphone so you can speak your memories instead of typing.",
+          "speechRecognitionPermission": "Memory Garden turns what you say into the text of your memory."
+        }
+      ]
     ],
     "backgroundColor": "#dedce2"
   }

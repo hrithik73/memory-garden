@@ -25,6 +25,12 @@ export function pretty(k: string) {
   return `${cap(WEEKDAYS[d.getDay()])}, ${d.getDate()} ${cap(MONTHS[d.getMonth()])} ${d.getFullYear()}`;
 }
 
+/** "Mon, 9 Nov" */
+export function tipDate(k: string) {
+  const d = fromKey(k);
+  return `${cap(WEEKDAYS[d.getDay()].slice(0, 3))}, ${d.getDate()} ${cap(MONTHS[d.getMonth()].slice(0, 3))}`;
+}
+
 /** "9 nov" */
 export function short(k: string) {
   const d = fromKey(k);

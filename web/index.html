@@ -73,6 +73,17 @@
   .cell.today svg { width: 115%; height: 115%; }
   .cell:hover .dot { transform: scale(2); }
   .cell .dot { transition: transform .15s; }
+  .cell { -webkit-touch-callout: none; }
+  .tip {
+    position: absolute; z-index: 5; pointer-events: none; max-width: 170px;
+    background: var(--ink); color: var(--bg); border-radius: 8px; padding: 6px 10px; text-align: center;
+    font: 12px/1.35 "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    box-shadow: 0 4px 12px rgb(0 0 0 / .15);
+    opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s;
+  }
+  .tip.on { opacity: 1; transform: none; }
+  .tip b { display: block; font-weight: 500; }
+  .tip span { display: block; font-size: 11px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* day view */
   #day { display: flex; flex-direction: column; }
@@ -96,6 +107,10 @@
   .done-row { width: 100%; display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
   .done { font-family: "Gaegu", cursive; font-size: 19px; background: var(--ink); color: var(--bg); border: 0; border-radius: 9px; padding: 6px 16px 4px; cursor: pointer; }
   .ghost { font: 13px "IBM Plex Mono", ui-monospace, Menlo, monospace; background: none; border: 0; color: var(--ink-soft); cursor: pointer; }
+  .done-row { align-items: center; }
+  .mic { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid var(--ink); background: none; color: var(--ink); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+  .mic svg { width: 22px; height: 22px; }
+  .mic.on { background: var(--ink); color: var(--bg); }
 
   footer { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 14px 0 18px; }
   .toggle { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--card); border: 1px solid var(--pill-border); }
@@ -165,7 +180,8 @@ const PLANTS = [
   '<path d="M9 31c0-10 3-18 10-24M19 7c2 0 4 1 5 3M13 14c-2 0-3 1-3 3M16 10.5c1.5 0 3 .5 3.5 2"/><path d="M8 17c0 2 1 3.5 2.5 3.5S13 19 13 17zM18 12.5c0 2 1 3.5 2.5 3.5S23 14.5 23 12.5zM22.5 10c0 2 1 3.5 2.5 3.5S27.5 12 27.5 10z"/>',
 ];
 const HOUSE = '<path d="M4 13L16 3.5 28 13M7 11v19h18V11M5 30h22"/><circle cx="16" cy="17.5" r="3.6"/><path d="M16 24v3"/>';
-const PLUS  = '<path d="M16 4.5c6.6-.5 11.5 4.2 11.5 11s-4.6 12-11.3 12S4.6 22.5 4.5 16C4.4 9.5 9.6 4.9 15 4.2"/><path d="M16 10.5v11M10.5 16h11"/>';
+const MIC = '<path d="M16 4.5a4 4 0 0 1 4 4v7a4 4 0 0 1-8 0v-7a4 4 0 0 1 4-4z"/><path d="M9 15a7 7 0 0 0 14 0M16 22v5M12 27.5h8"/>';
+const PLUS  ='<path d="M16 4.5c6.6-.5 11.5 4.2 11.5 11s-4.6 12-11.3 12S4.6 22.5 4.5 16C4.4 9.5 9.6 4.9 15 4.2"/><path d="M16 10.5v11M10.5 16h11"/>';
 const ICON_GARDEN = '<path d="M5 28v-9M5 23l-3-2M11 28V16M11 22l3-3M19 28v-8M26 28V15M26 21l-3-2"/><circle cx="5" cy="16" r="2.5"/><circle cx="11" cy="12.5" r="2.8"/><path d="M15 20a4 3 0 0 1 8 0z"/><circle cx="26" cy="11.5" r="2.8"/>';
 const ICON_DAY = '<path d="M16 30V17M16 25c-3 0-5-2-5-4 3 0 5 1 5 4"/><circle cx="16" cy="11" r="2"/><circle cx="16" cy="6" r="2.4"/><circle cx="20.6" cy="9.4" r="2.4"/><circle cx="18.8" cy="14.6" r="2.4"/><circle cx="13.2" cy="14.6" r="2.4"/><circle cx="11.4" cy="9.4" r="2.4"/>';
 const svg = (inner, cls = '') => `<svg class="d ${cls}" viewBox="0 0 32 32" aria-hidden="true">${inner}</svg>`;
@@ -224,16 +240,15 @@ function renderYear() {
   let d = new Date(year, 0, 1), html = '';
   while (d.getFullYear() === year) {
     const k = keyOf(d);
-    const j = hash(k + 'j');
-    const dx = (j % 7) - 3, dy = ((j >> 3) % 7) - 3;
     let inner, cls = 'cell';
     if (memories[k]) inner = svg(plantFor(k));
     else if (k === tk) { inner = svg(HOUSE); cls += ' today'; }
-    else { inner = `<span class="dot" style="translate:${dx}px ${dy}px"></span>`; if (k > tk) cls += ' future'; }
-    html += `<div class="${cls}" data-k="${k}" title="${short(k)}">${inner}</div>`;
+    else { inner = '<span class="dot"></span>'; if (k > tk) cls += ' future'; }
+    html += `<div class="${cls}" data-k="${k}">${inner}</div>`;
     d.setDate(d.getDate() + 1);
   }
   g.innerHTML = html;
+  hideTip();
   // keep the latest stretch of the garden in view
   const focus = g.querySelector(`[data-k="${sel.startsWith(year) ? sel : tk}"]`);
   if (focus) requestAnimationFrame(() => {
@@ -263,7 +278,7 @@ function renderDay() {
     c.innerHTML = `<div style="width:100%">
       <div class="date-line">${pretty(sel)}</div>
       <textarea id="ta" placeholder="Add a memory..." maxlength="2000"></textarea>
-      <div class="done-row">${m ? '<button class="ghost" id="del">remove</button>' : ''}<button class="ghost" id="cancel">cancel</button><button class="done" id="done">Done</button></div>
+      <div class="done-row">${SR ? `<button class="mic" id="mic" aria-label="Speak your memory">${svg(MIC)}</button><span class="ghost" id="listening" hidden>listening…</span><span style="flex:1"></span>` : ''}${m ? '<button class="ghost" id="del">remove</button>' : ''}<button class="ghost" id="cancel">cancel</button><button class="done" id="done">Done</button></div>
     </div>`;
     const ta = $('ta');
     ta.value = m ? m.text : '';
@@ -273,6 +288,7 @@ function renderDay() {
     ta.onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commit(); if (e.key === 'Escape') stopEdit(); };
     $('done').onclick = commit;
     $('cancel').onclick = stopEdit;
+    if (SR) $('mic').onclick = () => (rec ? rec.stop() : startMic());
     if (m) $('del').onclick = () => { if (confirm('Remove this memory?')) { delete memories[sel]; save(); stopEdit(); } };
   } else if (m) {
     c.innerHTML = `<div style="width:100%"><div class="date-line">${pretty(sel)}</div><div class="memory" id="mem"></div></div>`;
@@ -285,8 +301,44 @@ function renderDay() {
   }
 }
 
+/* speak-to-write: browser speech recognition, words added after what's already written */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+const buzz = ms => { if (navigator.vibrate) navigator.vibrate(ms); };
+const joinText = (before, spoken) =>
+  !spoken ? before : before.trim() ? `${before.replace(/\s+$/, '')} ${spoken}` : spoken;
+function setMic(on) {
+  const b = $('mic'); if (!b) return;
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-label', on ? 'Stop listening' : 'Speak your memory');
+  $('listening').hidden = !on;
+  $('ta').placeholder = on ? 'Listening...' : 'Add a memory...';
+}
+function startMic() {
+  const ta = $('ta'), before = ta.value;
+  rec = new SR();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = navigator.language || 'en-US';
+  rec.onresult = e => {
+    let spoken = '';
+    for (const r of e.results) spoken += r[0].transcript;
+    ta.value = joinText(before, spoken.trim());
+    ta.oninput && ta.oninput();
+  };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') alert('Allow microphone access for this page to speak your memories.');
+  };
+  rec.onend = () => { rec = null; setMic(false); buzz(10); };
+  rec.start();
+  setMic(true);
+  buzz(20);
+}
+function abortMic() { if (rec) { rec.onend = null; rec.abort(); rec = null; } }
+
 function startEdit() { editing = true; document.body.classList.add('typing'); render(); }
 function stopEdit() {
+  abortMic();
   editing = false; document.body.classList.remove('typing'); render();
   // iOS leaves the page scrolled after the keyboard closes; snap back
   requestAnimationFrame(() => window.scrollTo(0, 0));
@@ -313,8 +365,45 @@ function render() {
 /* ---------- events ---------- */
 $('grid').onclick = e => {
   const c = e.target.closest('.cell'); if (!c) return;
+  if (held) { held = false; return; } // a press-and-hold only peeks
   sel = c.dataset.k; view = 'day'; render();
 };
+
+/* date preview: hover with a mouse, press and hold on touch */
+const tip = document.createElement('div');
+tip.className = 'tip';
+$('year').appendChild(tip);
+const tipDate = k => fromKey(k).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+function showTip(c) {
+  const k = c.dataset.k, m = memories[k];
+  tip.innerHTML = '<b></b>' + (m ? '<span></span>' : '');
+  tip.querySelector('b').textContent = tipDate(k);
+  if (m) tip.querySelector('span').textContent = m.text;
+  const box = $('year'), x = c.offsetLeft + c.offsetWidth / 2;
+  tip.style.left = Math.min(Math.max(x - tip.offsetWidth / 2, 0), box.clientWidth - tip.offsetWidth) + 'px';
+  tip.style.top = (c.offsetTop - tip.offsetHeight - 4) + 'px';
+  tip.classList.add('on');
+}
+function hideTip() { tip.classList.remove('on'); }
+
+const canHover = matchMedia('(hover: hover)').matches;
+$('grid').addEventListener('mouseover', e => {
+  if (!canHover) return;
+  const c = e.target.closest('.cell'); if (c) showTip(c);
+});
+$('grid').addEventListener('mouseleave', hideTip);
+
+let held = false, holdTimer = null;
+$('grid').addEventListener('touchstart', e => {
+  const c = e.target.closest('.cell'); if (!c) return;
+  held = false;
+  holdTimer = setTimeout(() => { held = true; showTip(c); if (navigator.vibrate) navigator.vibrate(8); }, 300);
+}, { passive: true });
+$('grid').addEventListener('touchmove', () => clearTimeout(holdTimer), { passive: true });
+$('grid').addEventListener('touchend', e => {
+  clearTimeout(holdTimer);
+  if (held) { e.preventDefault(); hideTip(); held = false; }
+});
 $('strip').onclick = e => {
   const s = e.target.closest('.slot[data-k]'); if (!s || editing) return;
   sel = s.dataset.k; render();
