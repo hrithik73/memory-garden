@@ -1,0 +1,15 @@
+{
+  "name": "Memory Garden",
+  "short_name": "Garden",
+  "description": "One small memory a day, grown into a garden.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#dedce2",
+  "theme_color": "#dedce2",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
