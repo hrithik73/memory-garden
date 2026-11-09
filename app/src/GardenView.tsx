@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { type ComponentRef, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import { keyOf, tipDate } from './dates';
 import { DoodleView, HOUSE, plantFor } from './plants';
 import type { Memories } from './storage';
@@ -29,7 +30,8 @@ export function GardenView({ memories, year, setYear, today, focus, onPick }: Pr
   const gridW = cw * COLS;
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const [viewH, setViewH] = useState(0);
-  const [tip, setTip] = useState<{ k: string; x: number; y: number } | null>(null);
+  // index (into `days`) of the day under the finger while peeking
+  const [tip, setTip] = useState<number | null>(null);
 
   const nowYear = Number(today.slice(0, 4));
   const firstYear = useMemo(() => {
@@ -42,6 +44,31 @@ export function GardenView({ memories, year, setYear, today, focus, onPick }: Pr
     for (let d = new Date(year, 0, 1); d.getFullYear() === year; d.setDate(d.getDate() + 1)) out.push(keyOf(d));
     return out;
   }, [year]);
+
+  const tipKey = tip === null ? null : days[tip];
+
+  // a light tick each time the label moves to another day
+  useEffect(() => {
+    if (tip !== null) Haptics.selectionAsync().catch(() => {});
+  }, [tip]);
+
+  const scrub = useMemo(() => {
+    const dayAt = (x: number, y: number) => {
+      const col = Math.min(COLS - 1, Math.max(0, Math.floor(x / cw)));
+      const row = Math.max(0, Math.floor((y - PAD_TOP + ROW_GAP / 2) / (ch + ROW_GAP)));
+      return Math.min(days.length - 1, row * COLS + col);
+    };
+    const follow = (x: number, y: number) => {
+      const i = dayAt(x, y);
+      setTip((prev) => (prev === i ? prev : i));
+    };
+    return Gesture.Pan()
+      .activateAfterLongPress(250)
+      .runOnJS(true)
+      .onStart((e) => follow(e.x, e.y))
+      .onUpdate((e) => follow(e.x, e.y))
+      .onFinalize(() => setTip(null));
+  }, [cw, ch, days]);
 
   // keep the latest stretch of the garden in view
   useEffect(() => {
@@ -66,58 +93,53 @@ export function GardenView({ memories, year, setYear, today, focus, onPick }: Pr
         </Pressable>
       </View>
 
-      <ScrollView
-        ref={scroll}
-        onLayout={(e) => setViewH(e.nativeEvent.layout.height)}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.grid}
-      >
-        {days.map((k, i) => {
-          let inner;
-          if (memories[k]) inner = <DoodleView shapes={plantFor(k)} size={cw * 1.35} color={t.ink} />;
-          else if (k === today) inner = <DoodleView shapes={HOUSE} size={cw * 1.15} color={t.ink} />;
-          else inner = <View style={[s.dot, { backgroundColor: t.ink }, k > today && { opacity: 0.35 }]} />;
-          return (
-            <Pressable
-              key={k}
-              onPress={() => onPick(k)}
-              // press and hold to peek at the date without opening it
-              delayLongPress={250}
-              onLongPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setTip({ k, x: (i % COLS) * cw + cw / 2, y: PAD_TOP + Math.floor(i / COLS) * (ch + ROW_GAP) });
-              }}
-              onPressOut={() => setTip(null)}
-              style={[s.cell, { width: cw, height: ch }]}
-            >
-              {inner}
-            </Pressable>
-          );
-        })}
-        {tip && (() => {
-          const tipW = memories[tip.k] ? TIP_W : TIP_W_DATE;
-          return (
-          <View
-            pointerEvents="none"
-            style={[
-              s.tip,
-              {
-                backgroundColor: t.ink,
-                width: tipW,
-                left: Math.min(Math.max(tip.x - tipW / 2, 0), gridW - tipW),
-                top: tip.y - (memories[tip.k] ? 52 : 34),
-              },
-            ]}
-          >
-            <Text style={[s.tipDate, { color: t.bg }]}>{tipDate(tip.k)}</Text>
-            {memories[tip.k] && (
-              <Text numberOfLines={1} style={[s.tipText, { color: t.bg }]}>
-                {memories[tip.k].text}
-              </Text>
-            )}
+      <ScrollView ref={scroll} onLayout={(e) => setViewH(e.nativeEvent.layout.height)} showsVerticalScrollIndicator={false}>
+        {/* press and hold, then slide: the date label follows your finger from day to day */}
+        <GestureDetector gesture={scrub}>
+          <View style={s.grid}>
+            {days.map((k) => {
+              let inner;
+              if (memories[k]) inner = <DoodleView shapes={plantFor(k)} size={cw * 1.35} color={t.ink} />;
+              else if (k === today) inner = <DoodleView shapes={HOUSE} size={cw * 1.15} color={t.ink} />;
+              else inner = <View style={[s.dot, { backgroundColor: t.ink }, k > today && { opacity: 0.35 }]} />;
+              return (
+                <Pressable key={k} onPress={() => onPick(k)} style={[s.cell, { width: cw, height: ch }]}>
+                  {inner}
+                </Pressable>
+              );
+            })}
+            {tipKey &&
+              (() => {
+                const i = tip as number;
+                const m = memories[tipKey];
+                const tipW = m ? TIP_W : TIP_W_DATE;
+                const x = (i % COLS) * cw + cw / 2;
+                const y = PAD_TOP + Math.floor(i / COLS) * (ch + ROW_GAP);
+                return (
+                  <View
+                    pointerEvents="none"
+                    style={[
+                      s.tip,
+                      {
+                        backgroundColor: t.ink,
+                        width: tipW,
+                        left: Math.min(Math.max(x - tipW / 2, 0), gridW - tipW),
+                        // sit well above the finger
+                        top: y - (m ? 64 : 46),
+                      },
+                    ]}
+                  >
+                    <Text style={[s.tipDate, { color: t.bg }]}>{tipDate(tipKey)}</Text>
+                    {m && (
+                      <Text numberOfLines={1} style={[s.tipText, { color: t.bg }]}>
+                        {m.text}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })()}
           </View>
-          );
-        })()}
+        </GestureDetector>
       </ScrollView>
     </View>
   );
@@ -127,12 +149,29 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, paddingTop: 20, paddingBottom: 14 },
   chev: { fontFamily: F.mono, fontSize: 18, paddingHorizontal: 8, paddingVertical: 4 },
   disabled: { opacity: 0.25 },
-  pill: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9, shadowOpacity: 0.3, shadowRadius: 9, shadowOffset: { width: 0, height: 6 } },
+  pill: {
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    shadowOpacity: 0.3,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 6 },
+  },
   pillText: { fontFamily: F.monoMedium, fontSize: 15, lineHeight: 17 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: ROW_GAP, paddingTop: PAD_TOP, paddingBottom: 20 },
   cell: { alignItems: 'center', justifyContent: 'center' },
   dot: { width: 3, height: 3, borderRadius: 1.5 },
-  tip: { position: 'absolute', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
+  tip: {
+    position: 'absolute',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+  },
   tipDate: { fontFamily: F.monoMedium, fontSize: 12, lineHeight: 16 },
   tipText: { fontFamily: F.mono, fontSize: 11, lineHeight: 15, opacity: 0.8, marginTop: 1 },
 });

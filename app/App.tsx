@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { Alert, AppState, KeyboardAvoidingView, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { DayView } from './src/DayView';
 import { GardenView } from './src/GardenView';
@@ -42,8 +43,7 @@ export default function App() {
     setView(v);
   };
 
-  const exportBackup = () =>
-    Share.share({ title: 'Memory Garden backup', message: JSON.stringify(memories, null, 2) }).catch(() => {});
+  const exportBackup = () => Share.share({ title: 'Memory Garden backup', message: JSON.stringify(memories, null, 2) }).catch(() => {});
 
   const importFile = async () => {
     try {
@@ -60,70 +60,72 @@ export default function App() {
   const count = Object.keys(memories).length;
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="auto" />
-      <SafeAreaView style={[s.root, { backgroundColor: t.bg }]} edges={['top', 'bottom']}>
-        <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={s.main}>
-            {view === 'year' ? (
-              <GardenView
-                memories={memories}
-                year={year}
-                setYear={setYear}
-                today={today}
-                focus={sel}
-                onPick={(k) => {
-                  setSel(k);
-                  setView('day');
-                }}
-              />
-            ) : (
-              <DayView
-                day={sel}
-                setDay={(k) => {
-                  setSel(k);
-                  setEditing(false);
-                }}
-                today={today}
-                memories={memories}
-                put={put}
-                editing={editing}
-                setEditing={setEditing}
-              />
-            )}
-          </View>
-
-          {!editing && (
-            <View style={s.footer}>
-              <View style={[s.toggle, { backgroundColor: t.card, borderColor: t.pillBorder }]}>
-                {(['year', 'day'] as View_[]).map((v) => (
-                  <Pressable
-                    key={v}
-                    accessibilityLabel={v === 'year' ? 'Garden view' : 'Day view'}
-                    onPress={() => go(v)}
-                    style={[s.toggleBtn, view === v && { backgroundColor: t.ink }]}
-                  >
-                    <DoodleView shapes={v === 'year' ? ICON_GARDEN : ICON_DAY} size={30} color={view === v ? t.bg : t.ink} />
-                  </Pressable>
-                ))}
-              </View>
-              <View style={s.meta}>
-                <Text style={[s.metaText, { color: t.inkSoft }]}>
-                  <Text style={{ color: t.ink, fontFamily: F.monoMedium }}>{count}</Text>
-                  {count === 1 ? ' memory planted' : ' memories planted'}
-                </Text>
-                <Pressable onPress={exportBackup} hitSlop={6}>
-                  <Text style={[s.metaText, s.link, { color: t.inkSoft }]}>export</Text>
-                </Pressable>
-                <Pressable onPress={importFile} hitSlop={6}>
-                  <Text style={[s.metaText, s.link, { color: t.inkSoft }]}>import</Text>
-                </Pressable>
-              </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <StatusBar style="auto" />
+        <SafeAreaView style={[s.root, { backgroundColor: t.bg }]} edges={['top', 'bottom']}>
+          <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={s.main}>
+              {view === 'year' ? (
+                <GardenView
+                  memories={memories}
+                  year={year}
+                  setYear={setYear}
+                  today={today}
+                  focus={sel}
+                  onPick={(k) => {
+                    setSel(k);
+                    setView('day');
+                  }}
+                />
+              ) : (
+                <DayView
+                  day={sel}
+                  setDay={(k) => {
+                    setSel(k);
+                    setEditing(false);
+                  }}
+                  today={today}
+                  memories={memories}
+                  put={put}
+                  editing={editing}
+                  setEditing={setEditing}
+                />
+              )}
             </View>
-          )}
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </SafeAreaProvider>
+
+            {!editing && (
+              <View style={s.footer}>
+                <View style={[s.toggle, { backgroundColor: t.card, borderColor: t.pillBorder }]}>
+                  {(['year', 'day'] as View_[]).map((v) => (
+                    <Pressable
+                      key={v}
+                      accessibilityLabel={v === 'year' ? 'Garden view' : 'Day view'}
+                      onPress={() => go(v)}
+                      style={[s.toggleBtn, view === v && { backgroundColor: t.ink }]}
+                    >
+                      <DoodleView shapes={v === 'year' ? ICON_GARDEN : ICON_DAY} size={30} color={view === v ? t.bg : t.ink} />
+                    </Pressable>
+                  ))}
+                </View>
+                <View style={s.meta}>
+                  <Text style={[s.metaText, { color: t.inkSoft }]}>
+                    <Text style={{ color: t.ink, fontFamily: F.monoMedium }}>{count}</Text>
+                    {count === 1 ? ' memory planted' : ' memories planted'}
+                  </Text>
+                  <Pressable onPress={exportBackup} hitSlop={6}>
+                    <Text style={[s.metaText, s.link, { color: t.inkSoft }]}>export</Text>
+                  </Pressable>
+                  <Pressable onPress={importFile} hitSlop={6}>
+                    <Text style={[s.metaText, s.link, { color: t.inkSoft }]}>import</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

@@ -397,9 +397,17 @@ let held = false, holdTimer = null;
 $('grid').addEventListener('touchstart', e => {
   const c = e.target.closest('.cell'); if (!c) return;
   held = false;
-  holdTimer = setTimeout(() => { held = true; showTip(c); if (navigator.vibrate) navigator.vibrate(8); }, 300);
+  holdTimer = setTimeout(() => { held = true; tipCell = c; showTip(c); buzz(8); }, 300);
 }, { passive: true });
-$('grid').addEventListener('touchmove', () => clearTimeout(holdTimer), { passive: true });
+// after the hold, sliding moves the label from day to day instead of scrolling
+let tipCell = null;
+$('grid').addEventListener('touchmove', e => {
+  if (!held) { clearTimeout(holdTimer); return; }
+  e.preventDefault();
+  const t = e.touches[0];
+  const c = document.elementFromPoint(t.clientX, t.clientY)?.closest('.cell');
+  if (c && c !== tipCell) { tipCell = c; showTip(c); buzz(5); }
+}, { passive: false });
 $('grid').addEventListener('touchend', e => {
   clearTimeout(holdTimer);
   if (held) { e.preventDefault(); hideTip(); held = false; }
