@@ -34,6 +34,12 @@
           "microphonePermission": "Memory Garden uses the microphone so you can speak your memories instead of typing.",
           "speechRecognitionPermission": "Memory Garden turns what you say into the text of your memory."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "enableRemoteNotifications": false
+        }
       ]
     ],
     "backgroundColor": "#dedce2"

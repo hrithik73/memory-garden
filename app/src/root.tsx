@@ -16,6 +16,7 @@ import { notify } from './lib/dialogs';
 import { GardenView } from './components/garden-view';
 import { todayKey } from './lib/dates';
 import { DoodleView, ICON_DAY, ICON_GARDEN } from './components/plants';
+import { reminderSupported, timeLabel, useReminder } from './lib/reminder';
 import { useMemories } from './lib/storage';
 import { F, useTheme } from './lib/theme';
 
@@ -24,6 +25,7 @@ type View_ = 'year' | 'day';
 export default function App() {
   const [fontsLoaded] = useFonts({ IBMPlexMono_400Regular, IBMPlexMono_500Medium, Gaegu_700Bold });
   const { memories, ready, put, importBackup } = useMemories();
+  const reminder = useReminder(memories);
   const t = useTheme();
   const [today, setToday] = useState(todayKey());
   const [view, setView] = useState<View_>('year');
@@ -122,6 +124,13 @@ export default function App() {
                   <Pressable onPress={importFile} hitSlop={6}>
                     <Text style={[s.metaText, s.link, { color: t.inkSoft }]}>import</Text>
                   </Pressable>
+                  {reminderSupported && (
+                    <Pressable onPress={reminder.choose} hitSlop={6} accessibilityLabel="Daily reminder">
+                      <Text style={[s.metaText, s.link, { color: t.inkSoft }]}>
+                        {reminder.time ? `remind ${timeLabel(reminder.time)}` : 'remind me'}
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
             )}
