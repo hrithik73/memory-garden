@@ -16,14 +16,14 @@ import { notify } from './lib/dialogs';
 import { GardenView } from './components/garden-view';
 import { todayKey } from './lib/dates';
 import { DoodleView, ICON_DAY, ICON_GARDEN } from './components/plants';
-import { reminderSupported, timeLabel, useReminder } from './lib/reminder';
-import { useMemories } from './lib/storage';
+import { reminderSupported, timeLabel, useReminder, useReminderTap } from './lib/reminder';
+import { loadDraft, saveDraft, useMemories } from './lib/storage';
 import { F, useTheme } from './lib/theme';
 
 type View_ = 'year' | 'day';
 
 export default function App() {
-  const [fontsLoaded] = useFonts({ IBMPlexMono_400Regular, IBMPlexMono_500Medium, Gaegu_700Bold });
+  const [fontsLoaded, fontError] = useFonts({ IBMPlexMono_400Regular, IBMPlexMono_500Medium, Gaegu_700Bold });
   const { memories, ready, put, importBackup } = useMemories();
   const reminder = useReminder(memories);
   const t = useTheme();
@@ -32,16 +32,53 @@ export default function App() {
   const [sel, setSel] = useState(todayKey());
   const [year, setYear] = useState(new Date().getFullYear());
   const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
 
-  // roll "today" over when the app comes back after midnight
+  // roll "today" over at midnight, whether the app stayed open or comes back later
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (st) => {
-      if (st === 'active') setToday(todayKey());
-    });
-    return () => sub.remove();
+    const check = () => setToday(todayKey());
+    const sub = AppState.addEventListener('change', (st) => st === 'active' && check());
+    const timer = setInterval(check, 60_000);
+    return () => {
+      sub.remove();
+      clearInterval(timer);
+    };
   }, []);
 
-  if (!fontsLoaded || !ready) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
+  // reopen a memory that was being written when the app closed
+  const [resumed, setResumed] = useState(false);
+  useEffect(() => {
+    loadDraft()
+      .then((d) => {
+        if (!d) return;
+        setSel(d.day);
+        setView('day');
+        setDraft(d.text);
+        setEditing(true);
+      })
+      .finally(() => setResumed(true));
+  }, []);
+  useEffect(() => {
+    if (!resumed) return;
+    const id = setTimeout(() => saveDraft(editing ? { day: sel, text: draft } : null), 300);
+    return () => clearTimeout(id);
+  }, [resumed, editing, sel, draft]);
+
+  // tapping the evening reminder opens today, ready to write
+  useReminderTap(ready && resumed, () => {
+    if (editing) return; // don't interrupt something already being written
+    const now = todayKey();
+    setToday(now);
+    setSel(now);
+    setView('day');
+    if (!memories[now]) {
+      setDraft('');
+      setEditing(true);
+    }
+  });
+
+  // if the fonts fail to load, carry on with the system fonts rather than a blank screen
+  if ((!fontsLoaded && !fontError) || !ready || !resumed) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
 
   const go = (v: View_) => {
     if (editing || v === view) return;
@@ -55,8 +92,12 @@ export default function App() {
       const res = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain'], copyToCacheDirectory: true });
       if (res.canceled || !res.assets?.[0]) return;
       const text = await fetch(res.assets[0].uri).then((r) => r.text());
-      const n = importBackup(JSON.parse(text));
-      notify(`Imported ${n} ${n === 1 ? 'memory' : 'memories'}.`);
+      const { changed, total } = importBackup(JSON.parse(text));
+      const plural = (n: number) => `${n} ${n === 1 ? 'memory' : 'memories'}`;
+      if (!total) notify('No memories found in that file.');
+      else if (!changed) notify('Nothing new to import', `All ${plural(total)} in that file are already in your garden.`);
+      else if (changed === total) notify(`Imported ${plural(changed)}.`);
+      else notify(`Imported ${plural(changed)}.`, `${total - changed} already in your garden were kept as they are (yours were newer or the same).`);
     } catch {
       notify('That file could not be read.');
     }
@@ -95,6 +136,8 @@ export default function App() {
                   put={put}
                   editing={editing}
                   setEditing={setEditing}
+                  draft={draft}
+                  setDraft={setDraft}
                 />
               )}
             </View>

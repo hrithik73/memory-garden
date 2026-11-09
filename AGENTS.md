@@ -23,11 +23,12 @@ npx expo install --fix      # fix incompatible package versions
 
 Run lint and typecheck before declaring any task done.
 
-## Navigation & Routing
+## Project layout
 
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
+- One codebase for the iPhone app and the installable web app. There is no Expo Router: `index.ts` registers `src/root.tsx`, which switches between the garden (`src/components/garden-view.tsx`) and day (`src/components/day-view.tsx`) views.
+- `src/lib/` holds storage, dates, theme, reminders, voice and backup helpers. App icons and images are in `src/assets/` (referenced from `app.json`).
+- Web-only files (HTML shell, manifest, icons, offline service worker) live in `public/`. Bump `CACHE` in `public/sw.js` whenever you change it.
+- Memories are stored on-device only (AsyncStorage; `localStorage` on the web). Never write over saved data you failed to read.
 
 ## Building with EAS
 

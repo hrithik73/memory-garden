@@ -1,10 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useState } from 'react';
 import { PanResponder, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { addDays, pretty, short } from '../lib/dates';
+import { addDays, pretty, short, tipDate } from '../lib/dates';
 import { confirmDestructive } from '../lib/dialogs';
 import { DoodleView, HOUSE, MIC, PLUS, plantFor } from './plants';
-import type { Memories } from '../lib/storage';
+import { MAX_LEN, type Memories } from '../lib/storage';
 import { F, useTheme } from '../lib/theme';
 import { useDictation, voiceAvailable } from '../lib/voice';
 
@@ -20,12 +20,14 @@ type Props = {
   put: (day: string, text: string) => void;
   editing: boolean;
   setEditing: (e: boolean) => void;
+  /** The text being written; kept by the parent so it can be saved if the app closes. */
+  draft: string;
+  setDraft: (text: string) => void;
 };
 
-export function DayView({ day, setDay, today, memories, put, editing, setEditing }: Props) {
+export function DayView({ day, setDay, today, memories, put, editing, setEditing, draft, setDraft }: Props) {
   const t = useTheme();
   const memory = memories[day];
-  const [draft, setDraft] = useState('');
   const future = day > today;
 
   // speak-to-write: spoken words are added after the text written before the mic was tapped
@@ -60,17 +62,26 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
     setDraft(memory?.text ?? '');
     setEditing(true);
   };
-  const commit = () => {
+  const close = () => {
     if (listening) stopListening();
-    put(day, draft);
     setEditing(false);
-    if (draft.trim()) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   };
   const remove = () =>
     confirmDestructive('Remove this memory?', 'Remove', () => {
       put(day, '');
-      setEditing(false);
+      close();
     });
+  const commit = () => {
+    // emptying the text removes the memory, so ask first, same as "remove"
+    if (!draft.trim() && memory) return remove();
+    put(day, draft);
+    close();
+    if (draft.trim()) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  };
+  const cancel = () => {
+    if (draft.trim() === (memory?.text ?? '')) return close();
+    confirmDestructive('Discard your changes?', 'Discard', close);
+  };
 
   // web: arrow keys step between days
   useEffect(() => {
@@ -87,7 +98,7 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
   const dateLine = <Text style={[s.dateLine, { color: t.inkSoft }]}>{pretty(day)}</Text>;
 
   return (
-    <View style={{ flex: 1 }} {...pan.panHandlers}>
+    <View style={s.page} {...pan.panHandlers}>
       <View style={s.header}>
         <Pressable
           onPress={() => !editing && setDay(today)}
@@ -106,6 +117,9 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
             <Pressable
               key={k}
               disabled={editing}
+              accessibilityRole="button"
+              accessibilityLabel={`${tipDate(k)}${k === today ? ', today' : ''}${memories[k] ? ', memory planted' : ''}`}
+              accessibilityState={{ selected: sel }}
               onPress={() => setDay(k)}
               style={[s.slot, { opacity: sel ? 1 : 0.4, transform: [{ scale: sel ? 1.1 : 1 }] }]}
             >
@@ -134,15 +148,12 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
                 // web: Cmd/Ctrl+Enter saves, Escape cancels
                 const k = e.nativeEvent as { key: string; metaKey?: boolean; ctrlKey?: boolean };
                 if (k.key === 'Enter' && (k.metaKey || k.ctrlKey)) commit();
-                else if (k.key === 'Escape') {
-                  if (listening) stopListening();
-                  setEditing(false);
-                }
+                else if (k.key === 'Escape') cancel();
               }}
               placeholder={listening ? 'Listening...' : 'Add a memory...'}
               placeholderTextColor={t.inkSoft}
               selectionColor={t.ink}
-              maxLength={2000}
+              maxLength={MAX_LEN}
               style={[s.input, { color: t.ink }]}
             />
             <View style={s.doneRow}>
@@ -163,13 +174,7 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
                   <Text style={[s.ghost, { color: t.inkSoft }]}>remove</Text>
                 </Pressable>
               )}
-              <Pressable
-                onPress={() => {
-                  if (listening) stopListening();
-                  setEditing(false);
-                }}
-                hitSlop={8}
-              >
+              <Pressable onPress={cancel} hitSlop={8}>
                 <Text style={[s.ghost, { color: t.inkSoft }]}>cancel</Text>
               </Pressable>
               <Pressable onPress={commit} style={({ pressed }) => [s.done, { backgroundColor: t.ink }, pressed && { opacity: 0.85 }]}>
@@ -194,6 +199,8 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
 }
 
 const s = StyleSheet.create({
+  // on a wide browser window, keep the writing at a readable width
+  page: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center' },
   header: { alignItems: 'center', paddingTop: 20, paddingBottom: 14 },
   pill: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
   pillText: { fontFamily: F.monoMedium, fontSize: 13, lineHeight: 15 },

@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { type ComponentRef, useEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentRef, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import { keyOf, tipDate } from '../lib/dates';
@@ -28,10 +28,18 @@ export function GardenView({ memories, year, setYear, today, focus, onPick }: Pr
   const cw = (Math.min(width, 430) - 32) / COLS;
   const ch = cw * 1.25;
   const gridW = cw * COLS;
+  // stable callbacks, so moving the date label doesn't redraw all 365 days
+  const pickRef = useRef(onPick);
+  useEffect(() => {
+    pickRef.current = onPick;
+  });
+  const pick = useCallback((k: string) => pickRef.current(k), []);
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const [viewH, setViewH] = useState(0);
   // index (into `days`) of the day under the finger while peeking
   const [tip, setTip] = useState<number | null>(null);
+  const hoverIn = useCallback((i: number) => setTip(i), []);
+  const hoverOut = useCallback((i: number) => setTip((prev) => (prev === i ? null : prev)), []);
 
   const nowYear = Number(today.slice(0, 4));
   const firstYear = useMemo(() => {
@@ -96,25 +104,23 @@ export function GardenView({ memories, year, setYear, today, focus, onPick }: Pr
       <ScrollView ref={scroll} onLayout={(e) => setViewH(e.nativeEvent.layout.height)} showsVerticalScrollIndicator={false}>
         {/* press and hold, then slide: the date label follows your finger from day to day */}
         <GestureDetector gesture={scrub}>
-          <View style={s.grid}>
-            {days.map((k, i) => {
-              let inner;
-              if (memories[k]) inner = <DoodleView shapes={plantFor(k)} size={cw * 1.35} color={t.ink} />;
-              else if (k === today) inner = <DoodleView shapes={HOUSE} size={cw * 1.15} color={t.ink} />;
-              else inner = <View style={[s.dot, { backgroundColor: t.ink }, k > today && { opacity: 0.35 }]} />;
-              return (
-                <Pressable
-                  key={k}
-                  onPress={() => onPick(k)}
-                  // web: hovering with a mouse shows the date too
-                  onHoverIn={() => setTip(i)}
-                  onHoverOut={() => setTip((prev) => (prev === i ? null : prev))}
-                  style={[s.cell, { width: cw, height: ch }]}
-                >
-                  {inner}
-                </Pressable>
-              );
-            })}
+          {/* a fixed width (plus a hair of slack for rounding) keeps exactly COLS days per row on any screen */}
+          <View style={[s.grid, { width: gridW + 1 }]}>
+            {days.map((k, i) => (
+              <Cell
+                key={k}
+                day={k}
+                index={i}
+                kind={memories[k] ? 'memory' : k === today ? 'today' : k > today ? 'future' : 'past'}
+                isToday={k === today}
+                cw={cw}
+                ch={ch}
+                color={t.ink}
+                onPick={pick}
+                onHoverIn={hoverIn}
+                onHoverOut={hoverOut}
+              />
+            ))}
             {tipKey &&
               (() => {
                 const i = tip as number;
@@ -152,6 +158,39 @@ export function GardenView({ memories, year, setYear, today, focus, onPick }: Pr
   );
 }
 
+type CellProps = {
+  day: string;
+  index: number;
+  kind: 'memory' | 'today' | 'future' | 'past';
+  isToday: boolean;
+  cw: number;
+  ch: number;
+  color: string;
+  onPick: (day: string) => void;
+  onHoverIn: (i: number) => void;
+  onHoverOut: (i: number) => void;
+};
+
+const Cell = memo(function Cell({ day, index, kind, isToday, cw, ch, color, onPick, onHoverIn, onHoverOut }: CellProps) {
+  let inner;
+  if (kind === 'memory') inner = <DoodleView shapes={plantFor(day)} size={cw * 1.35} color={color} />;
+  else if (kind === 'today') inner = <DoodleView shapes={HOUSE} size={cw * 1.15} color={color} />;
+  else inner = <View style={[s.dot, { backgroundColor: color }, kind === 'future' && { opacity: 0.35 }]} />;
+  return (
+    <Pressable
+      onPress={() => onPick(day)}
+      // web: hovering with a mouse shows the date too
+      onHoverIn={() => onHoverIn(index)}
+      onHoverOut={() => onHoverOut(index)}
+      accessibilityRole="button"
+      accessibilityLabel={`${tipDate(day)}${isToday ? ', today' : ''}${kind === 'memory' ? ', memory planted' : ''}`}
+      style={[s.cell, { width: cw, height: ch }]}
+    >
+      {inner}
+    </Pressable>
+  );
+});
+
 const s = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, paddingTop: 20, paddingBottom: 14 },
   chev: { fontFamily: F.mono, fontSize: 18, paddingHorizontal: 8, paddingVertical: 4 },
@@ -165,7 +204,7 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
   },
   pillText: { fontFamily: F.monoMedium, fontSize: 15, lineHeight: 17 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: ROW_GAP, paddingTop: PAD_TOP, paddingBottom: 20 },
+  grid: { alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', rowGap: ROW_GAP, paddingTop: PAD_TOP, paddingBottom: 20 },
   cell: { alignItems: 'center', justifyContent: 'center' },
   dot: { width: 3, height: 3, borderRadius: 1.5 },
   tip: {

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, Platform } from 'react-native';
 import { addDays, fromKey, todayKey } from './dates';
 import { notify } from './dialogs';
@@ -68,7 +68,7 @@ async function reschedule(time: ReminderTime | null, memories: Memories) {
     date.setHours(time.hour, time.minute, 0, 0);
     if (date.getTime() <= now) continue;
     await Notifications.scheduleNotificationAsync({
-      content: { title: 'Memory Garden', body: LINES[i % LINES.length] },
+      content: { title: 'Memory Garden', body: LINES[i % LINES.length], data: { kind: 'reminder' } },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date, channelId: 'reminder' },
     });
   }
@@ -140,4 +140,28 @@ export function useReminder(memories: Memories) {
   }, [save, time]);
 
   return { time, choose };
+}
+
+/**
+ * Calls `onTap` when the person opens the app from a reminder (including a cold start).
+ * Waits until `enabled`, so the app can finish loading first.
+ */
+export function useReminderTap(enabled: boolean, onTap: () => void) {
+  const latest = useRef(onTap);
+  useEffect(() => {
+    latest.current = onTap;
+  });
+
+  useEffect(() => {
+    if (!reminderSupported || !enabled) return;
+    const handle = (r: Notifications.NotificationResponse | null) => {
+      if (r?.notification.request.content.data?.kind !== 'reminder') return;
+      // forget it, so the next ordinary launch doesn't open the editor again
+      Notifications.clearLastNotificationResponseAsync().catch(() => {});
+      latest.current();
+    };
+    Notifications.getLastNotificationResponseAsync().then(handle).catch(() => {});
+    const sub = Notifications.addNotificationResponseReceivedListener(handle);
+    return () => sub.remove();
+  }, [enabled]);
 }
