@@ -1,5 +1,5 @@
 import Svg, { Circle, Path } from 'react-native-svg';
-import { hash } from './dates';
+import { hash } from '../lib/dates';
 
 /** A doodle is a list of path strings and circles ([cx, cy, r]) on a 32×32 grid. */
 type Shape = string | [number, number, number];

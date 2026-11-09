@@ -2,10 +2,10 @@ import * as Haptics from 'expo-haptics';
 import { type ComponentRef, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
-import { keyOf, tipDate } from './dates';
+import { keyOf, tipDate } from '../lib/dates';
 import { DoodleView, HOUSE, plantFor } from './plants';
-import type { Memories } from './storage';
-import { F, useTheme } from './theme';
+import type { Memories } from '../lib/storage';
+import { F, useTheme } from '../lib/theme';
 
 type Props = {
   memories: Memories;
@@ -97,13 +97,20 @@ export function GardenView({ memories, year, setYear, today, focus, onPick }: Pr
         {/* press and hold, then slide: the date label follows your finger from day to day */}
         <GestureDetector gesture={scrub}>
           <View style={s.grid}>
-            {days.map((k) => {
+            {days.map((k, i) => {
               let inner;
               if (memories[k]) inner = <DoodleView shapes={plantFor(k)} size={cw * 1.35} color={t.ink} />;
               else if (k === today) inner = <DoodleView shapes={HOUSE} size={cw * 1.15} color={t.ink} />;
               else inner = <View style={[s.dot, { backgroundColor: t.ink }, k > today && { opacity: 0.35 }]} />;
               return (
-                <Pressable key={k} onPress={() => onPick(k)} style={[s.cell, { width: cw, height: ch }]}>
+                <Pressable
+                  key={k}
+                  onPress={() => onPick(k)}
+                  // web: hovering with a mouse shows the date too
+                  onHoverIn={() => setTip(i)}
+                  onHoverOut={() => setTip((prev) => (prev === i ? null : prev))}
+                  style={[s.cell, { width: cw, height: ch }]}
+                >
                   {inner}
                 </Pressable>
               );

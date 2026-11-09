@@ -1,11 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { addDays, pretty, short } from './dates';
+import { PanResponder, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { addDays, pretty, short } from '../lib/dates';
+import { confirmDestructive } from '../lib/dialogs';
 import { DoodleView, HOUSE, MIC, PLUS, plantFor } from './plants';
-import type { Memories } from './storage';
-import { F, useTheme } from './theme';
-import { useDictation, voiceAvailable } from './voice';
+import type { Memories } from '../lib/storage';
+import { F, useTheme } from '../lib/theme';
+import { useDictation, voiceAvailable } from '../lib/voice';
 
 /** Add spoken words after what was already written. */
 const joinText = (before: string, spoken: string) =>
@@ -66,17 +67,22 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
     if (draft.trim()) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   };
   const remove = () =>
-    Alert.alert('Remove this memory?', undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => {
-          put(day, '');
-          setEditing(false);
-        },
-      },
-    ]);
+    confirmDestructive('Remove this memory?', 'Remove', () => {
+      put(day, '');
+      setEditing(false);
+    });
+
+  // web: arrow keys step between days
+  useEffect(() => {
+    if (Platform.OS !== 'web' || editing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const next = addDays(day, e.key === 'ArrowLeft' ? -1 : 1);
+      if (next <= today) setDay(next);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [day, editing, today, setDay]);
 
   const dateLine = <Text style={[s.dateLine, { color: t.inkSoft }]}>{pretty(day)}</Text>;
 
@@ -124,6 +130,15 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
               multiline
               value={draft}
               onChangeText={setDraft}
+              onKeyPress={(e) => {
+                // web: Cmd/Ctrl+Enter saves, Escape cancels
+                const k = e.nativeEvent as { key: string; metaKey?: boolean; ctrlKey?: boolean };
+                if (k.key === 'Enter' && (k.metaKey || k.ctrlKey)) commit();
+                else if (k.key === 'Escape') {
+                  if (listening) stopListening();
+                  setEditing(false);
+                }
+              }}
               placeholder={listening ? 'Listening...' : 'Add a memory...'}
               placeholderTextColor={t.inkSoft}
               selectionColor={t.ink}

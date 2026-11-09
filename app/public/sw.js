@@ -1,5 +1,5 @@
 // Offline support: serve from cache, refresh in the background.
-const CACHE = 'garden-v3';
+const CACHE = 'garden-v4';
 const CORE = ['./', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {

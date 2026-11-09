@@ -1,18 +1,23 @@
-import { Gaegu_700Bold } from '@expo-google-fonts/gaegu';
-import { IBMPlexMono_400Regular, IBMPlexMono_500Medium, useFonts } from '@expo-google-fonts/ibm-plex-mono';
+// import each font from its own path so builds only bundle the weights we use
+import { Gaegu_700Bold } from '@expo-google-fonts/gaegu/700Bold';
+import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono/400Regular';
+import { IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono/500Medium';
+import { useFonts } from 'expo-font';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Alert, AppState, KeyboardAvoidingView, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { AppState, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { DayView } from './src/DayView';
-import { GardenView } from './src/GardenView';
-import { todayKey } from './src/dates';
-import { DoodleView, ICON_DAY, ICON_GARDEN } from './src/plants';
-import { useMemories } from './src/storage';
-import { F, useTheme } from './src/theme';
+import { DayView } from './components/day-view';
+import { exportBackup } from './lib/backup';
+import { notify } from './lib/dialogs';
+import { GardenView } from './components/garden-view';
+import { todayKey } from './lib/dates';
+import { DoodleView, ICON_DAY, ICON_GARDEN } from './components/plants';
+import { useMemories } from './lib/storage';
+import { F, useTheme } from './lib/theme';
 
 type View_ = 'year' | 'day';
 
@@ -43,17 +48,15 @@ export default function App() {
     setView(v);
   };
 
-  const exportBackup = () => Share.share({ title: 'Memory Garden backup', message: JSON.stringify(memories, null, 2) }).catch(() => {});
-
   const importFile = async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain'], copyToCacheDirectory: true });
       if (res.canceled || !res.assets?.[0]) return;
       const text = await fetch(res.assets[0].uri).then((r) => r.text());
       const n = importBackup(JSON.parse(text));
-      Alert.alert(`Imported ${n} ${n === 1 ? 'memory' : 'memories'}.`);
+      notify(`Imported ${n} ${n === 1 ? 'memory' : 'memories'}.`);
     } catch {
-      Alert.alert('That file could not be read.');
+      notify('That file could not be read.');
     }
   };
 
@@ -113,7 +116,7 @@ export default function App() {
                     <Text style={{ color: t.ink, fontFamily: F.monoMedium }}>{count}</Text>
                     {count === 1 ? ' memory planted' : ' memories planted'}
                   </Text>
-                  <Pressable onPress={exportBackup} hitSlop={6}>
+                  <Pressable onPress={() => exportBackup(memories)} hitSlop={6}>
                     <Text style={[s.metaText, s.link, { color: t.inkSoft }]}>export</Text>
                   </Pressable>
                   <Pressable onPress={importFile} hitSlop={6}>
