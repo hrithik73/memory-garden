@@ -8,7 +8,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "uk.hritik.memorygarden",
+      "bundleIdentifier": "hritik.memorygarden.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -21,7 +21,7 @@
         "monochromeImage": "./src/assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "uk.hritik.memorygarden"
+      "package": "hritik.memorygarden.app"
     },
     "web": {
       "favicon": "./src/assets/favicon.png"
