@@ -2,6 +2,8 @@
 
 One small memory a day, grown into a garden.
 
+<img src="docs/screenshot.png" alt="Memory Garden: a year of daily memories shown as a grid of plants" width="320">
+
 One Expo / React Native codebase builds both the iPhone app and the installable web version.
 
 - Expo Go (no voice): `npx expo start`
