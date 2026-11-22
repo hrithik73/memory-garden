@@ -1,9 +1,10 @@
 // Offline support: pages come from the network when it's quick, otherwise from the cache;
 // everything else is served from the cache and refreshed in the background.
-const CACHE = 'garden-v5';
+const CACHE = 'garden-v6';
 // './' only, not './index.html': hosts with clean URLs redirect that, and browsers refuse
 // to open a page from a redirected response.
-const CORE = ['./', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png'];
+// canvaskit.wasm is what draws the garden on the web, so it's needed offline from the first visit
+const CORE = ['./', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png', './canvaskit.wasm'];
 const PAGE_TIMEOUT = 3000;
 const MAX_BUNDLES = 20; // old hashed JS/CSS from earlier deploys are dropped beyond this
 

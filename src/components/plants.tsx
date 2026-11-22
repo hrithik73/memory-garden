@@ -1,5 +1,9 @@
+import { Canvas, Group, Path as SkiaPath, Skia, type SkPath } from '@shopify/react-native-skia';
+import { useEffect } from 'react';
+import { useReducedMotion, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { hash } from '../lib/dates';
+import { EASE_OUT } from '../lib/motion';
 
 /** A doodle is a list of path strings and circles ([cx, cy, r]) on a 32×32 grid. */
 type Shape = string | [number, number, number];
@@ -53,16 +57,68 @@ export const ICON_GARDEN: Doodle = ['M5 28v-9M5 23l-3-2M11 28V16M11 22l3-3M19 28
 export const ICON_DAY: Doodle = ['M16 30V17M16 25c-3 0-5-2-5-4 3 0 5 1 5 4', [16, 11, 2], [16, 6, 2.4], [20.6, 9.4, 2.4], [18.8, 14.6, 2.4], [13.2, 14.6, 2.4], [11.4, 9.4, 2.4]];
 
 /** Same day → same plant, matching the web version. */
-export const plantFor = (day: string) => PLANTS[hash(day) % PLANTS.length];
+export const plantIndex = (day: string) => hash(day) % PLANTS.length;
+export const plantFor = (day: string) => PLANTS[plantIndex(day)];
+
+/** Stroke width in the 32×32 doodle grid, shared by the SVG and Skia drawings. */
+export const STROKE = 1.5;
+
+// Skia paths are built on first use (on the web, CanvasKit has to be loaded first) and kept.
+const pathCache = new Map<Doodle, SkPath>();
+
+/** One Skia path holding every stroke and circle of a doodle, in the 32×32 grid. */
+export function doodlePath(d: Doodle): SkPath {
+  let p = pathCache.get(d);
+  if (!p) {
+    const b = Skia.PathBuilder.Make();
+    for (const shape of d) {
+      if (typeof shape === 'string') {
+        const sub = Skia.Path.MakeFromSVGString(shape);
+        if (sub) b.addPath(sub);
+      } else b.addCircle(shape[0], shape[1], shape[2]);
+    }
+    p = b.build();
+    pathCache.set(d, p);
+  }
+  return p;
+}
+
+/** Skia paths for every plant (indexed like plantIndex) and the house. */
+export const plantPaths = () => PLANTS.map(doodlePath);
+export const housePath = () => doodlePath(HOUSE);
+
+/** A doodle that draws itself in, stroke by stroke, once when it mounts. */
+export function GrowingDoodle({ shapes, size, color }: { shapes: Doodle; size: number; color: string }) {
+  const reduced = useReducedMotion();
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.set(withDelay(150, withTiming(1, { duration: reduced ? 200 : 800, easing: EASE_OUT })));
+  }, [progress, reduced]);
+  return (
+    <Canvas style={{ width: size, height: size }}>
+      <Group transform={[{ scale: size / 32 }]} opacity={reduced ? progress : 1}>
+        <SkiaPath
+          path={doodlePath(shapes)}
+          style="stroke"
+          strokeWidth={STROKE}
+          strokeCap="round"
+          strokeJoin="round"
+          color={color}
+          end={reduced ? 1 : progress}
+        />
+      </Group>
+    </Canvas>
+  );
+}
 
 export function DoodleView({ shapes, size, color }: { shapes: Doodle; size: number; color: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 32 32">
       {shapes.map((s, i) =>
         typeof s === 'string' ? (
-          <Path key={i} d={s} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+          <Path key={i} d={s} fill="none" stroke={color} strokeWidth={STROKE} strokeLinecap="round" strokeLinejoin="round" />
         ) : (
-          <Circle key={i} cx={s[0]} cy={s[1]} r={s[2]} fill="none" stroke={color} strokeWidth={1.5} />
+          <Circle key={i} cx={s[0]} cy={s[1]} r={s[2]} fill="none" stroke={color} strokeWidth={STROKE} />
         ),
       )}
     </Svg>

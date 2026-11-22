@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { PanResponder, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { addDays, pretty, short, tipDate } from '../lib/dates';
 import { confirmDestructive } from '../lib/dialogs';
-import { DoodleView, HOUSE, MIC, PLUS, plantFor } from './plants';
+import { DoodleView, GrowingDoodle, HOUSE, MIC, PLUS, plantFor } from './plants';
 import { MAX_LEN, type Memories } from '../lib/storage';
 import { F, useTheme } from '../lib/theme';
 import { useDictation, voiceAvailable } from '../lib/voice';
@@ -23,9 +23,11 @@ type Props = {
   /** The text being written; kept by the parent so it can be saved if the app closes. */
   draft: string;
   setDraft: (text: string) => void;
+  /** a day that just got its first memory: its plant draws itself in */
+  justPlanted: string | null;
 };
 
-export function DayView({ day, setDay, today, memories, put, editing, setEditing, draft, setDraft }: Props) {
+export function DayView({ day, setDay, today, memories, put, editing, setEditing, draft, setDraft, justPlanted }: Props) {
   const t = useTheme();
   const memory = memories[day];
   const future = day > today;
@@ -123,7 +125,9 @@ export function DayView({ day, setDay, today, memories, put, editing, setEditing
               onPress={() => setDay(k)}
               style={[s.slot, { opacity: sel ? 1 : 0.4, transform: [{ scale: sel ? 1.1 : 1 }] }]}
             >
-              {memories[k] ? (
+              {memories[k] && k === justPlanted ? (
+                <GrowingDoodle shapes={plantFor(k)} size={38} color={t.ink} />
+              ) : memories[k] ? (
                 <DoodleView shapes={plantFor(k)} size={38} color={t.ink} />
               ) : k === today ? (
                 <DoodleView shapes={HOUSE} size={38} color={t.ink} />

@@ -33,6 +33,13 @@ export default function App() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  // a day that just got its first memory; its plant draws itself in once, then this is cleared
+  const [justPlanted, setJustPlanted] = useState<string | null>(null);
+  const plant = (day: string, text: string) => {
+    if (text.trim() && !memories[day]) setJustPlanted(day);
+    else if (!text.trim() && day === justPlanted) setJustPlanted(null);
+    put(day, text);
+  };
 
   // roll "today" over at midnight, whether the app stayed open or comes back later
   useEffect(() => {
@@ -123,6 +130,8 @@ export default function App() {
                     setSel(k);
                     setView('day');
                   }}
+                  justPlanted={justPlanted}
+                  onGrown={() => setJustPlanted(null)}
                 />
               ) : (
                 <DayView
@@ -133,7 +142,8 @@ export default function App() {
                   }}
                   today={today}
                   memories={memories}
-                  put={put}
+                  put={plant}
+                  justPlanted={justPlanted}
                   editing={editing}
                   setEditing={setEditing}
                   draft={draft}

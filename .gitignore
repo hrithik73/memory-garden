@@ -43,3 +43,6 @@ yarn-error.*
 # local
 .claude/
 .env*
+
+# copied from canvaskit-wasm on install (see the postinstall script)
+public/canvaskit.wasm
