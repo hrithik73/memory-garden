@@ -3,7 +3,7 @@
 One small memory a day, grown into a garden. A single Expo codebase builds the iPhone app and an installable web app.
 
 <p>
-  <img src="docs/screenshot.png" alt="The garden: a year of daily memories shown as a grid of plants" width="280">
+  <img src="docs/garden.gif" alt="The garden: stepping between years, pressing and sliding across the plants to see each day, then planting today's memory and watching it grow in" width="280">
   <img src="docs/screenshot-write.png" alt="Writing today's memory" width="280">
 </p>
 
